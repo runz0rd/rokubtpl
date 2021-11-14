@@ -1,0 +1,9 @@
+roku:
+  host: 192.168.0.61
+  port: 8060
+bt:
+  destination_mac_addr: FC:58:FA:44:06:59
+  source_adapter_id: hci0
+private_listening_bin_path: /path/to/the/bin.file
+debug: true
+check_delay_sec: 5

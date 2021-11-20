@@ -60,16 +60,10 @@ func (r BluetoothPrivateListening) IsRokuUp() bool {
 func (r *BluetoothPrivateListening) Start() error {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	r.ctxCancel = ctxCancel
-	isConnected, err := r.bt.IsConnected(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "bluetooth connect check failed")
+	if err := r.bt.Connect(ctx, r.btDevAddr); err != nil {
+		return errors.WithMessage(err, "bluetooth connect failed")
 	}
-	if !isConnected {
-		if err := r.bt.Connect(ctx, r.btDevAddr); err != nil {
-			return errors.WithMessage(err, "bluetooth connect failed")
-		}
-		r.log.Debug("connected bt device")
-	}
+	r.log.Debug("connected bt device")
 	go func() {
 		for {
 			r.log.Debug("starting private listening")
@@ -90,16 +84,10 @@ func (r *BluetoothPrivateListening) Stop() error {
 		r.isPlStarted = false
 	}
 	ctx := context.Background()
-	isConnected, err := r.bt.IsConnected(ctx)
-	if err != nil {
-		return errors.WithMessage(err, "bluetooth connect check failed")
+	if err := r.bt.Disconnect(ctx); err != nil {
+		return errors.WithMessage(err, "bluetooth disconnect failed")
 	}
-	if isConnected {
-		if err := r.bt.Disconnect(ctx); err != nil {
-			return errors.WithMessage(err, "bluetooth disconnect failed")
-		}
-		r.log.Debug("disconnected bt device")
-	}
+	r.log.Debug("disconnected bt device")
 	return nil
 }
 

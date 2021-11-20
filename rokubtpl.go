@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/mitchellh/go-ps"
-	"github.com/muka/go-bluetooth/bluez/profile/device"
 	"github.com/picatz/roku"
 	"github.com/pkg/errors"
+	"github.com/runz0rd/btctl"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -23,19 +23,19 @@ type BluetoothPrivateListening struct {
 	log         *logrus.Entry
 	host        string
 	port        int
-	bt          *device.Device1
 	btDevAddr   string
+	bt          *btctl.BluetoothCtl
 	pl          RokuPrivateListening
 	ctxCancel   context.CancelFunc
 	isPlStarted bool
 }
 
 func New(log *logrus.Entry, c *Config, pl RokuPrivateListening) (*BluetoothPrivateListening, error) {
-	btDevice, err := device.NewDevice(c.BT.SourceAdapterId, c.BT.DestinationMacAddr)
+	bt, err := btctl.NewBluetoothCtl()
 	if err != nil {
-		return nil, errors.WithMessagef(err, "bt device %q not found", c.BT.DestinationMacAddr)
+		return nil, err
 	}
-	return &BluetoothPrivateListening{log: log, host: c.Roku.Host, port: c.Roku.Port, bt: btDevice, pl: pl, btDevAddr: c.BT.DestinationMacAddr}, nil
+	return &BluetoothPrivateListening{log: log, host: c.Roku.Host, port: c.Roku.Port, pl: pl, btDevAddr: c.BT.DestinationMacAddr, bt: bt}, nil
 }
 
 func (r BluetoothPrivateListening) IsPlStarted() bool {
@@ -60,8 +60,12 @@ func (r BluetoothPrivateListening) IsRokuUp() bool {
 func (r *BluetoothPrivateListening) Start() error {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	r.ctxCancel = ctxCancel
-	if !r.isBTConnected() {
-		if err := connectBtDevice(ctx, r.btDevAddr); err != nil {
+	isConnected, err := r.bt.IsConnected(ctx)
+	if err != nil {
+		return err
+	}
+	if !isConnected {
+		if err := r.bt.Connect(ctx, r.btDevAddr); err != nil {
 			return err
 		}
 		r.log.Debug("connected bt device")
@@ -85,21 +89,18 @@ func (r *BluetoothPrivateListening) Stop() error {
 		r.log.Debug("stopped private listening")
 		r.isPlStarted = false
 	}
-	if r.isBTConnected() {
-		if err := r.bt.Disconnect(); err != nil {
+	ctx := context.Background()
+	isConnected, err := r.bt.IsConnected(ctx)
+	if err != nil {
+		return err
+	}
+	if isConnected {
+		if err := r.bt.Disconnect(ctx); err != nil {
 			return err
 		}
 		r.log.Debug("disconnected bt device")
 	}
 	return nil
-}
-
-func (r BluetoothPrivateListening) isBTConnected() bool {
-	connected, err := r.bt.GetConnected()
-	if err != nil {
-		return false
-	}
-	return connected
 }
 
 func findPid(parent, query string) (int, error) {
@@ -124,16 +125,6 @@ func findPid(parent, query string) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("couldnt find %q process", query)
-}
-
-func connectBtDevice(ctx context.Context, device string) error {
-	if out, err := exec.CommandContext(ctx, "bluetoothctl", "power", "on").Output(); err != nil {
-		return errors.WithMessage(err, string(out))
-	}
-	if out, err := exec.CommandContext(ctx, "bluetoothctl", "connect", device).Output(); err != nil {
-		return errors.WithMessage(err, string(out))
-	}
-	return nil
 }
 
 type Config struct {

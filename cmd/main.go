@@ -43,6 +43,6 @@ func run(logger *logrus.Logger, c *rokubtpl.Config) error {
 		if !isUp && rbt.IsPlStarted() {
 			rbt.Stop()
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Duration(c.CheckDelaySec) * time.Second)
 	}
 }

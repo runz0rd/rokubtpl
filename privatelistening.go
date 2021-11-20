@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"syscall"
-	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type RokuPrivateListening interface {
@@ -30,7 +27,10 @@ func (pl JarPrivateListening) Cmd(ctx context.Context, ip string) *exec.Cmd {
 }
 
 func (pl JarPrivateListening) Start(ctx context.Context, ip string) error {
-	return pl.Cmd(ctx, ip).Start()
+	if out, err := pl.Cmd(ctx, ip).CombinedOutput(); err != nil {
+		return errors.WithMessage(err, string(out))
+	}
+	return nil
 }
 
 type PyPrivateListening struct {
@@ -57,22 +57,4 @@ func (pl PyPrivateListening) Start(ctx context.Context, ip string) error {
 		cmd.Stderr = os.Stdout
 	}
 	return cmd.Start()
-}
-
-// attempts rerun if process is borked
-func monitorProcess(l *logrus.Entry, cmd *exec.Cmd, delay time.Duration) {
-	for {
-		if cmd.Process == nil {
-			if err := cmd.Start(); err != nil {
-				l.Debug(errors.WithMessage(err, "start failed"))
-			}
-		}
-		if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
-			l.Debug(errors.WithMessage(err, "process not up or not responding"))
-			if err := cmd.Start(); err != nil {
-				l.Debug(errors.WithMessage(err, "start failed"))
-			}
-		}
-		time.Sleep(delay)
-	}
 }

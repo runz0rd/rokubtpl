@@ -32,7 +32,7 @@ type BluetoothPrivateListening struct {
 func New(log *logrus.Entry, c *Config, pl RokuPrivateListening) (*BluetoothPrivateListening, error) {
 	btDevice, err := device.NewDevice(c.BT.SourceAdapterId, c.BT.DestinationMacAddr)
 	if err != nil {
-		return nil, fmt.Errorf("bt device %q not found: %s", c.BT.DestinationMacAddr, err)
+		return nil, errors.WithMessagef(err, "bt device %q not found", c.BT.DestinationMacAddr)
 	}
 	return &BluetoothPrivateListening{log: log, host: c.Roku.Host, port: c.Roku.Port, bt: btDevice, pl: pl}, nil
 }
@@ -65,8 +65,15 @@ func (r *BluetoothPrivateListening) Start() error {
 		}
 		r.log.Debug("connected bt device")
 	}
-	r.log.Debug("starting private listening")
-	go monitorProcess(r.log, r.pl.Cmd(ctx, r.host), 3*time.Second)
+	go func() {
+		for {
+			r.log.Debug("starting private listening")
+			if err := r.pl.Start(ctx, r.host); err != nil {
+				r.log.Debug(errors.WithMessage(err, "private listening failed"))
+			}
+			time.Sleep(3 * time.Second)
+		}
+	}()
 	r.isPlStarted = true
 	return nil
 }
@@ -142,9 +149,9 @@ type Config struct {
 		DestinationMacAddr string `yaml:"destination_mac_addr,omitempty"`
 		SourceAdapterId    string `yaml:"source_adapter_id,omitempty"`
 	} `yaml:"bt,omitempty"`
-	PrivateListeningBinPath string        `yaml:"private_listening_bin_path,omitempty"`
-	Debug                   bool          `yaml:"debug,omitempty"`
-	CheckDelaySec           time.Duration `yaml:"check_delay_sec,omitempty"`
+	PrivateListeningBinPath string `yaml:"private_listening_bin_path,omitempty"`
+	Debug                   bool   `yaml:"debug,omitempty"`
+	CheckDelaySec           int    `yaml:"check_delay_sec,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {

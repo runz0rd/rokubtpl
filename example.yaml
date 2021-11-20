@@ -4,6 +4,6 @@ roku:
 bt:
   destination_mac_addr: FC:58:FA:44:06:59
   source_adapter_id: hci0
-private_listening_bin_path: /path/to/the/bin.file
+private_listening_bin_path: /RPListening.jar
 debug: true
 check_delay_sec: 5

@@ -62,11 +62,11 @@ func (r *BluetoothPrivateListening) Start() error {
 	r.ctxCancel = ctxCancel
 	isConnected, err := r.bt.IsConnected(ctx)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "bluetooth connect check failed")
 	}
 	if !isConnected {
 		if err := r.bt.Connect(ctx, r.btDevAddr); err != nil {
-			return err
+			return errors.WithMessage(err, "bluetooth connect failed")
 		}
 		r.log.Debug("connected bt device")
 	}
@@ -92,11 +92,11 @@ func (r *BluetoothPrivateListening) Stop() error {
 	ctx := context.Background()
 	isConnected, err := r.bt.IsConnected(ctx)
 	if err != nil {
-		return err
+		return errors.WithMessage(err, "bluetooth connect check failed")
 	}
 	if isConnected {
 		if err := r.bt.Disconnect(ctx); err != nil {
-			return err
+			return errors.WithMessage(err, "bluetooth disconnect failed")
 		}
 		r.log.Debug("disconnected bt device")
 	}

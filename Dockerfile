@@ -1,13 +1,14 @@
-FROM openjdk:17-jdk-alpine AS builder
-WORKDIR /
-RUN apk add git
-RUN git clone https://github.com/wseemann/RPListening.git
-RUN cd RPListening/RPListening && ./gradlew customFatJar
-
-FROM golang:alpine
+FROM golang:buster
 WORKDIR /
 COPY . .
-RUN apk add bluez openjdk11 ffmpeg && apk add -X http://dl-cdn.alpinelinux.org/alpine/edge/community bluez-alsa
-COPY --from=builder /RPListening/RPListening/build/libs/RPListening-1.1.jar /RPListening.jar
 RUN go build -o /rokubtpl cmd/main.go
-ENTRYPOINT [ "/rokubtpl" ]
+
+FROM openjdk:17-slim
+WORKDIR /
+RUN apt-get update && apt-get install -y git bluez bluetooth
+RUN git clone https://github.com/wseemann/RPListening.git
+RUN cd RPListening/RPListening && ./gradlew customFatJar
+COPY entrypoint.sh entrypoint.sh
+COPY --from=0 /rokubtpl /rokubtpl
+RUN cp /RPListening/RPListening/build/libs/RPListening-1.1.jar /RPListening.jar
+ENTRYPOINT sh entrypoint.sh

@@ -38,10 +38,14 @@ func run(logger *logrus.Logger, c *rokubtpl.Config) error {
 		log.Debug("checking if up")
 		isUp := rbt.IsRokuUp()
 		if isUp && !rbt.IsPlStarted() {
-			rbt.Start()
+			if err := rbt.Start(); err != nil {
+				return err
+			}
 		}
 		if !isUp && rbt.IsPlStarted() {
-			rbt.Stop()
+			if err := rbt.Stop(); err != nil {
+				return err
+			}
 		}
 		time.Sleep(time.Duration(c.CheckDelaySec) * time.Second)
 	}

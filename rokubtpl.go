@@ -24,6 +24,7 @@ type BluetoothPrivateListening struct {
 	host        string
 	port        int
 	bt          *device.Device1
+	btDevAddr   string
 	pl          RokuPrivateListening
 	ctxCancel   context.CancelFunc
 	isPlStarted bool
@@ -34,7 +35,7 @@ func New(log *logrus.Entry, c *Config, pl RokuPrivateListening) (*BluetoothPriva
 	if err != nil {
 		return nil, errors.WithMessagef(err, "bt device %q not found", c.BT.DestinationMacAddr)
 	}
-	return &BluetoothPrivateListening{log: log, host: c.Roku.Host, port: c.Roku.Port, bt: btDevice, pl: pl}, nil
+	return &BluetoothPrivateListening{log: log, host: c.Roku.Host, port: c.Roku.Port, bt: btDevice, pl: pl, btDevAddr: c.BT.DestinationMacAddr}, nil
 }
 
 func (r BluetoothPrivateListening) IsPlStarted() bool {
@@ -60,7 +61,7 @@ func (r *BluetoothPrivateListening) Start() error {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	r.ctxCancel = ctxCancel
 	if !r.isBTConnected() {
-		if err := connectBtDevice(r.bt); err != nil {
+		if err := connectBtDevice(ctx, r.btDevAddr); err != nil {
 			return err
 		}
 		r.log.Debug("connected bt device")
@@ -125,17 +126,13 @@ func findPid(parent, query string) (int, error) {
 	return 0, fmt.Errorf("couldnt find %q process", query)
 }
 
-func connectBtDevice(dev *device.Device1) error {
-	if !dev.Properties.Paired {
-		if err := dev.Pair(); err != nil {
-			return fmt.Errorf("bt device pair %q failed: %s", dev.Properties.Address, err)
-		}
-		// return dev, fmt.Errorf("bt device %q already paired", macAddr)
+func connectBtDevice(ctx context.Context, device string) error {
+	if out, err := exec.CommandContext(ctx, "bluetoothctl", "power", "on").Output(); err != nil {
+		return errors.WithMessage(err, string(out))
 	}
-	if err := dev.Connect(); err != nil {
-		return fmt.Errorf("bt device %q connect failed: %s", dev.Properties.Address, err)
+	if out, err := exec.CommandContext(ctx, "bluetoothctl", "connect", device).Output(); err != nil {
+		return errors.WithMessage(err, string(out))
 	}
-
 	return nil
 }
 
